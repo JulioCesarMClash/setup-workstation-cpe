@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.4
+
+- Added a fresh-host smoke workflow scaffold for Linux, macOS, and Windows.
+- Added uninstall and rollback support using installer state.
+- Added supported platform documentation, pack presets, and one-command installer entrypoints.
+- Added diagnostic install report output and release checksum generation helper.
+
 ## v1.0.3
 
 - Added uninstall and rollback scripts based on installer state.
