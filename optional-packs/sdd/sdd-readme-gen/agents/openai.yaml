@@ -1,0 +1,4 @@
+interface:
+  display_name: "SDD README Generator"
+  short_description: "Genera README desde artefactos SDD"
+  default_prompt: "Use $sdd-readme-gen to create or refresh a professional README.md from the current SDD state."

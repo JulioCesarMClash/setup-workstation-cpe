@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "default_core": {
+    "vendored": true,
+    "root": "default-skills",
+    "skills": [
+      "brainstorming",
+      "security-review",
+      "comment-writer",
+      "cognitive-doc-design"
+    ]
+  },
+  "packs": {
+    "sdd": {
+      "vendored": true,
+      "root": "optional-packs/sdd",
+      "skills": [
+        "_shared",
+        "sdd-init",
+        "sdd-explore",
+        "sdd-propose",
+        "sdd-spec",
+        "sdd-design",
+        "sdd-tasks",
+        "sdd-apply",
+        "sdd-verify",
+        "sdd-archive",
+        "sdd-architecture",
+        "tdd-triple-helice",
+        "ollama-task-router",
+        "sdd-find-skills",
+        "sdd-readme-gen"
+      ]
+    },
+    "docs-jira": {
+      "vendored": true,
+      "root": "optional-packs/docs-jira",
+      "skills": [
+        "api-doc-gen",
+        "confluence-doc",
+        "exec-pdf-doc",
+        "unified-docs-pipeline",
+        "jira-evidence-formatter",
+        "jira-ticket-hierarchy",
+        "docx",
+        "xlsx",
+        "llm-wiki",
+        "sdd-markitdown"
+      ]
+    },
+    "data-etl": {
+      "vendored": true,
+      "root": "optional-packs/data-etl",
+      "skills": [
+        "python-testing",
+        "etl-sec",
+        "etl-sonar",
+        "systematic-debugging"
+      ]
+    },
+    "frontend": {
+      "vendored": true,
+      "root": "optional-packs/frontend",
+      "skills": [
+        "webapp-testing",
+        "sdd-front"
+      ]
+    },
+    "git-release": {
+      "vendored": true,
+      "root": "optional-packs/git-release",
+      "skills": [
+        "branch-pr",
+        "issue-creation",
+        "senior-vcs-commander",
+        "git-branch-strategy",
+        "gh-repo-bootstrap",
+        "gate",
+        "chained-pr",
+        "using-git-worktrees",
+        "work-unit-commits"
+      ]
+    },
+    "advanced-review": {
+      "vendored": true,
+      "root": "optional-packs/advanced-review",
+      "skills": [
+        "code-reviewer",
+        "judgment-day",
+        "ponytail-review",
+        "ponytail-audit",
+        "ponytail-debt",
+        "ponytail-help",
+        "mcp-builder",
+        "skill-creator",
+        "skill-improver",
+        "senior-skill-architect-master"
+      ]
+    }
+  }
+}

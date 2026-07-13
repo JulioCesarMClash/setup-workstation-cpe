@@ -1,0 +1,121 @@
+# =============================================================
+# .gitignore — Python Hexagonal (FastAPI / pytest / psycopg / Google APIs)
+# Estándar: 050_Estandar_Git_Workflow_Ambientes
+# Principio: todo lo necesario para correr el proyecto VA en el repo.
+#            credenciales, secrets y logs de runtime NO van.
+#            Los .md SÍ van — son documentación.
+# =============================================================
+
+# ── PYTHON: bytecode y caches ─────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# ── ENTORNOS VIRTUALES: locales, no portables ─────────────────
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# ── VARIABLES DE ENTORNO Y CREDENCIALES ───────────────────────
+# REGLA: .env NUNCA sube. .env.example SÍ sube (sin valores reales).
+.env
+.env.*
+!.env.example
+
+# ── SECRETS Y CREDENCIALES ────────────────────────────────────
+# El directorio secrets/ se ignora completo.
+# Para preservar la estructura, commitear secrets/.gitkeep vacío.
+secrets/
+!secrets/.gitkeep
+
+# Claves, certificados y service accounts de Google
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+google_service_account*.json
+service_account*.json
+*credentials*.json
+
+# ── TESTING: artefactos generados ─────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+
+# ── HERRAMIENTAS DE CALIDAD: caches locales ───────────────────
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+
+# ── BUILD Y DISTRIBUCIÓN ──────────────────────────────────────
+dist/
+build/
+*.egg-info/
+*.egg
+MANIFEST
+pip-wheel-metadata/
+.eggs/
+
+# ── LOGS DE RUNTIME ───────────────────────────────────────────
+# REGLA: los logs se generan en ejecución, no son código ni docs.
+# Si un log ya fue commiteado: git rm --cached <archivo.log>
+# y agregar la entrada aquí antes del próximo commit.
+*.log
+logs/
+*.log.*
+bunker_devops.log
+
+# ── TEMPORALES Y SISTEMA OPERATIVO ───────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+tmp/
+temp/
+
+# ── IDEs ──────────────────────────────────────────────────────
+# .idea/ y .vscode/ son configuración local de cada máquina.
+# Excepción permitida: compartir settings de formato/linting.
+.idea/
+*.iml
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# ── BASE DE DATOS LOCAL ───────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── JUPYTER (exploración local) ───────────────────────────────
+.ipynb_checkpoints/
+
+# ── SKILL REGISTRY (interno de Claude Code) ──────────────────
+.atl/
+
+# =============================================================
+# QUÉ NUNCA DEBE IGNORARSE — incluir explícitamente si hay duda
+# =============================================================
+# requirements.txt        ← dependencias exactas del proyecto
+# pyproject.toml          ← config de herramientas (ruff, mypy, pytest)
+# pytest.ini / setup.cfg  ← config de tests
+# .env.example            ← plantilla de variables (sin valores reales)
+# Makefile                ← comandos del proyecto
+# .github/workflows/      ← CI/CD
+# *.md                    ← TODA la documentación
+# src/                    ← TODO el código fuente
+# tests/                  ← TODOS los tests
+# config/*.yaml           ← configuración no sensible
+# secrets/.gitkeep        ← estructura del directorio de secrets
+# =============================================================

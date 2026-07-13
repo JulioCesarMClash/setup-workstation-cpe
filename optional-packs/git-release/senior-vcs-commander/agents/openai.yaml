@@ -1,0 +1,4 @@
+interface:
+  display_name: "Senior VCS Commander"
+  short_description: "Git, Jira y CI/CD con trazabilidad SDD"
+  default_prompt: "Use $senior-vcs-commander to manage branching, atomic commits, Jira linkage, CI checks, and PR readiness for this SDD change."

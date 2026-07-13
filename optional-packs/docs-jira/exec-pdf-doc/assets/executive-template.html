@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>$title$</title>
+<style>
+  /* ── Reset & Base ────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Inter, "Segoe UI", system-ui, sans-serif;
+    font-size: 11pt;
+    line-height: 1.7;
+    color: #1a1a2e;
+    background: #fff;
+  }
+
+  /* ── Cover Page ──────────────────────────────────── */
+  .cover {
+    background: linear-gradient(160deg, #003366 0%, #1d6fa4 100%);
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 80px 72px;
+    page-break-after: always;
+  }
+  .cover-label {
+    font-size: 10pt;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #93c5fd;
+    margin-bottom: 24px;
+  }
+  .cover h1 {
+    font-size: 32pt;
+    font-weight: 700;
+    line-height: 1.2;
+    border: none;
+    color: #fff;
+    margin-bottom: 12px;
+  }
+  .cover-subtitle {
+    font-size: 14pt;
+    color: #bfdbfe;
+    margin-bottom: 48px;
+    font-weight: 300;
+  }
+  .cover-meta {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 8px 16px;
+    font-size: 10pt;
+    color: #bfdbfe;
+    border-top: 1px solid rgba(255,255,255,0.2);
+    padding-top: 32px;
+    max-width: 480px;
+  }
+  .cover-meta .label { color: #93c5fd; font-weight: 600; }
+
+  /* ── Content wrapper ─────────────────────────────── */
+  .content {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 48px 56px;
+  }
+
+  /* ── TOC ─────────────────────────────────────────── */
+  nav#TOC {
+    page-break-after: always;
+    padding: 40px 0 24px;
+  }
+  nav#TOC h2 {
+    font-size: 10pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #003366;
+    border: none;
+    margin-bottom: 20px;
+    padding-bottom: 0;
+  }
+  nav#TOC ul {
+    list-style: none;
+    padding: 0;
+  }
+  nav#TOC li { margin: 4px 0; }
+  nav#TOC a {
+    text-decoration: none;
+    color: #1a1a2e;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px dotted #cbd5e1;
+    padding-bottom: 2px;
+    font-size: 10.5pt;
+  }
+  nav#TOC a:hover { color: #003366; }
+  nav#TOC ul ul { margin-left: 20px; }
+  nav#TOC ul ul a { font-size: 9.5pt; color: #475569; }
+
+  /* ── Headings ────────────────────────────────────── */
+  h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
+
+  h1 {
+    font-size: 20pt;
+    color: #003366;
+    border-bottom: 3px solid #003366;
+    padding-bottom: 10px;
+    margin: 48px 0 20px;
+    page-break-before: always;
+  }
+  h1:first-of-type { page-break-before: avoid; }
+
+  h2 {
+    font-size: 14pt;
+    color: #1d6fa4;
+    border-bottom: 1px solid #bfdbfe;
+    padding-bottom: 6px;
+    margin: 36px 0 14px;
+  }
+
+  h3 {
+    font-size: 11.5pt;
+    color: #1e3a8a;
+    margin: 24px 0 10px;
+  }
+
+  h4 {
+    font-size: 10.5pt;
+    color: #374151;
+    margin: 18px 0 8px;
+  }
+
+  /* ── Paragraphs & Lists ──────────────────────────── */
+  p { margin: 0 0 12px; }
+  ul, ol { padding-left: 22px; margin: 8px 0 12px; }
+  li { margin: 4px 0; }
+
+  /* ── Tables ──────────────────────────────────────── */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0 24px;
+    font-size: 9.5pt;
+    page-break-inside: avoid;
+  }
+  thead th {
+    background: #003366;
+    color: #fff;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 9pt;
+  }
+  tbody td {
+    padding: 7px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+  }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  tbody tr:hover { background: #eff6ff; }
+
+  /* ── Code ────────────────────────────────────────── */
+  code {
+    font-family: "JetBrains Mono", "Fira Code", "Courier New", monospace;
+    font-size: 8.5pt;
+    background: #f1f5f9;
+    color: #0f172a;
+    padding: 2px 5px;
+    border-radius: 3px;
+    border: 1px solid #e2e8f0;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 16px 20px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 12px 0 20px;
+    font-size: 8.5pt;
+    line-height: 1.6;
+    page-break-inside: avoid;
+  }
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #e2e8f0;
+    font-size: inherit;
+  }
+
+  /* ── Blockquotes / Callouts ──────────────────────── */
+  blockquote {
+    border-left: 4px solid #1d6fa4;
+    background: #eff6ff;
+    color: #1e3a8a;
+    padding: 10px 16px;
+    margin: 12px 0 16px;
+    border-radius: 0 6px 6px 0;
+    font-size: 10pt;
+  }
+
+  /* ── HR ──────────────────────────────────────────── */
+  hr {
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    margin: 32px 0;
+  }
+
+  /* ── Footer ──────────────────────────────────────── */
+  @page {
+    margin: 20mm 18mm;
+    @bottom-center {
+      content: counter(page);
+      font-size: 9pt;
+      color: #94a3b8;
+    }
+  }
+
+  /* ── Print ───────────────────────────────────────── */
+  @media print {
+    body { font-size: 10.5pt; }
+    .content { padding: 0; }
+    h1 { page-break-before: always; }
+    h1:first-of-type { page-break-before: avoid; }
+    table, pre, blockquote { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── COVER PAGE ── -->
+<div class="cover">
+  <div class="cover-label">$if(project)$$project$ · $endif$Documentación Técnica</div>
+  <h1>$title$</h1>
+  $if(subtitle)$<div class="cover-subtitle">$subtitle$</div>$endif$
+  <div class="cover-meta">
+    $if(version)$<span class="label">Versión</span><span>$version$</span>$endif$
+    $if(date)$<span class="label">Fecha</span><span>$date$</span>$endif$
+    $if(project)$<span class="label">Proyecto</span><span>$project$</span>$endif$
+    <span class="label">Clasificación</span><span>Uso interno</span>
+  </div>
+</div>
+
+<!-- ── CONTENT ── -->
+<div class="content">
+
+$if(toc)$
+<nav id="TOC">
+  <h2>Índice de Contenidos</h2>
+  $table-of-contents$
+</nav>
+$endif$
+
+$body$
+
+</div>
+</body>
+</html>
