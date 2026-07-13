@@ -137,3 +137,32 @@ def test_pack_manifest_marks_all_current_packs_as_vendored():
     assert manifest["packs"]["advanced-review"]["vendored"] is True
     assert manifest["packs"]["frontend"]["vendored"] is True
     assert manifest["packs"]["data-etl"]["vendored"] is True
+
+
+def test_ensure_env_file_copies_example_when_missing(tmp_path):
+    source_env = tmp_path / ".env.example"
+    target_env = tmp_path / ".env"
+    source_env.write_text('FOO="bar"\n', encoding="utf-8")
+
+    created = bootstrap.ensure_env_file(target_env, source_env)
+
+    assert created is True
+    assert target_env.read_text(encoding="utf-8") == 'FOO="bar"\n'
+
+
+def test_build_python_install_command_prefers_winget_on_windows():
+    command = bootstrap.build_python_install_command(
+        platform_name="windows",
+        command_paths={"winget": "winget", "choco": None, "scoop": None},
+    )
+
+    assert command == ["winget", "install", "-e", "--id", "Python.Python.3.12"]
+
+
+def test_build_python_install_command_prefers_brew_on_darwin():
+    command = bootstrap.build_python_install_command(
+        platform_name="darwin",
+        command_paths={"brew": "brew"},
+    )
+
+    assert command == ["brew", "install", "python"]

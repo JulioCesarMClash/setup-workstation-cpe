@@ -147,6 +147,14 @@ def merge_env_text(template_text: str, updates: dict[str, str]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def ensure_env_file(env_file: Path, source_env: Path) -> bool:
+    if env_file.exists():
+        return False
+    env_file.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_env, env_file)
+    return True
+
+
 def detect_command_paths() -> dict[str, str | None]:
     names = [
         "claude",
@@ -450,6 +458,26 @@ def detect_platform_name() -> str:
     return "linux"
 
 
+def build_python_install_command(platform_name: str, command_paths: dict[str, str | None]) -> list[str] | None:
+    brew_path = command_paths.get("brew")
+    winget_path = command_paths.get("winget")
+    choco_path = command_paths.get("choco")
+    scoop_path = command_paths.get("scoop")
+
+    if platform_name == "darwin" and brew_path:
+        return [brew_path, "install", "python"]
+
+    if platform_name == "windows":
+        if winget_path:
+            return [winget_path, "install", "-e", "--id", "Python.Python.3.12"]
+        if choco_path:
+            return [choco_path, "install", "python", "-y"]
+        if scoop_path:
+            return [scoop_path, "install", "python"]
+
+    return None
+
+
 def build_install_command(tool: str, platform_name: str, command_paths: dict[str, str | None]) -> list[str] | None:
     uv_path = command_paths.get("uv")
     pipx_path = command_paths.get("pipx")
@@ -661,6 +689,9 @@ def main() -> int:
     if not source_env.exists():
         print(f"Missing source env file: {source_env}", file=sys.stderr)
         return 1
+
+    if ensure_env_file(env_file, source_env):
+        print(f"Created env file from template: {env_file}")
 
     platform_name = detect_platform_name()
     command_paths = detect_command_paths()
