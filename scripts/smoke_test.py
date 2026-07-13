@@ -125,15 +125,36 @@ def main() -> int:
     opencode_config_dir = Path(os.environ.get("OPENCODE_CONFIG_DIR", Path.home() / ".config" / "opencode"))
     config_file = opencode_config_dir / "opencode.json"
 
+    failures: list[str] = []
+
     print("Gentle AI workspace smoke test")
     print("================================")
 
-    for command in ["opencode", "claude", "ollama", "node", "npm", "git", "engram", "graphify", "headroom"]:
+    required_commands = ["opencode", "node", "npm", "git"]
+    optional_commands = ["claude", "ollama", "engram", "graphify", "headroom"]
+
+    for command in required_commands:
         check_cmd(command)
-    check_python_runtime()
+        if not shutil.which(command):
+            failures.append(f"missing command:{command}")
+
+    for command in optional_commands:
+        check_cmd(command)
+
+    python_ok = False
+    for name in ["python3", "python", "py"]:
+        if shutil.which(name):
+            print(f"OK   python runtime: {name}")
+            python_ok = True
+            break
+    if not python_ok:
+        print("MISS python runtime: python3/python/py")
+        failures.append("missing python runtime")
 
     claude_enabled = os.environ.get("CLAUDE_CODE_ENABLED", "false").lower() == "true"
     print(f"OK   optional claude code enabled={claude_enabled}")
+    if claude_enabled and not shutil.which("claude"):
+        failures.append("claude enabled but command missing")
     optional_packs = [item for item in os.environ.get("GENTLE_OPTIONAL_PACKS", "").split(",") if item]
     if optional_packs:
         print(f"OK   optional packs: {', '.join(optional_packs)}")
@@ -149,6 +170,8 @@ def main() -> int:
         for agent in AGENTS:
             model = config.get("agent", {}).get(agent, {}).get("model", "<missing>")
             print(f"OK   agent: {agent} => {model}")
+            if str(model).startswith("ollama/") and not shutil.which("ollama"):
+                failures.append(f"ollama required by agent:{agent}")
         for mcp in ["engram", "obsidian", "obsidian-semantic", "jira", "headroom", "playwright"]:
             enabled = config.get("mcp", {}).get(mcp, {}).get("enabled", True)
             print(f"OK   mcp: {mcp} enabled={enabled}")
@@ -167,11 +190,13 @@ def main() -> int:
             if skill_path.is_symlink() and skill_path.exists():
                 print(f"OK   skill link: {skill_name} -> {skill_path.resolve()}")
             elif skill_path.exists():
-                print(f"WARN skill link: {skill_name} exists but is not a symlink")
+                print(f"OK   skill copy fallback: {skill_name}")
             else:
                 print(f"MISS skill link: {skill_name}")
+                failures.append(f"missing skill:{skill_name}")
     else:
         print(f"MISS config: {config_file}")
+        failures.append("missing opencode config")
 
     ollama_path = shutil.which("ollama")
     if ollama_path:
@@ -188,6 +213,14 @@ def main() -> int:
                 print(f"     - {name}")
         else:
             print("MISS ollama models: none detected")
+            if any(str(config.get("agent", {}).get(agent, {}).get("model", "")).startswith("ollama/") for agent in AGENTS) if config_file.exists() else False:
+                failures.append("missing ollama models")
+
+    if failures:
+        print("FAILURES:")
+        for failure in failures:
+            print(f"- {failure}")
+        return 1
 
     return 0
 

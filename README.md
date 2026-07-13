@@ -45,6 +45,8 @@ Restart OpenCode after installation. OpenCode loads config at startup.
 - Current version: `v1.0.1`
 - Release artifact source of truth: `pack-manifest.json`
 - Distribution guide: `docs/distribution-guide.md`
+- Guided installation: `docs/guided-installation.md`
+- Workspace usage: `docs/workspace-usage.md`
 
 ## What This Installs
 
@@ -108,6 +110,8 @@ Example:
 ./scripts/bootstrap.sh --pack sdd --pack git-release --pack docs-jira
 ./scripts/smoke-test.sh
 ```
+
+If you want a step-by-step walkthrough instead of the short path, start with `docs/guided-installation.md` and then `docs/workspace-usage.md`.
 
 ## Required Dependencies
 
