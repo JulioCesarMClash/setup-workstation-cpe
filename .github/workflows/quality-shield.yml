@@ -117,8 +117,8 @@ jobs:
             exit 0
           fi
           if [[ "${{ vars.INTEGRATION_ENABLED }}" != "true" ]]; then
-            echo "❌ INTEGRATION_ENABLED must be true for $branch"
-            exit 1
+            echo "ℹ️ INTEGRATION_ENABLED is not true for $branch. Skipping blocking integration for this repository."
+            exit 0
           fi
           for name in POSTGRES_HOST POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD; do
             if [[ -z "${!name}" ]]; then

@@ -7,7 +7,6 @@ This repository packages the reusable workstation architecture only. It does not
 ## Quick Start
 
 ```bash
-cp .env.example .env
 # Linux/macOS
 ./scripts/bootstrap.sh --pack sdd --pack git-release
 ./scripts/smoke-test.sh
@@ -15,7 +14,6 @@ cp .env.example .env
 
 ```powershell
 # Windows PowerShell
-Copy-Item .env.example .env
 .\scripts\bootstrap.ps1 --pack sdd --pack git-release
 .\scripts\smoke-test.ps1
 ```
@@ -25,6 +23,8 @@ The bootstrap asks whether the user has OpenCode Go access. If not, it falls bac
 It also asks whether to install Claude Code as an optional secondary agent. OpenCode remains the main configured workspace runtime.
 
 When supported on the host, the bootstrap can attempt to install missing tools such as OpenCode, Claude Code, Graphify, Headroom, and Obsidian. It also scaffolds a lightweight Obsidian workflow structure so teams keep the same way of working even if their vault tree is not identical to yours.
+
+If Python is missing, the bootstrap wrappers try to install it first using the host package manager. If `.env` is missing, the bootstrap creates it automatically from `.env.example`.
 
 The bootstrap also installs a small default skill core as symlinks into `OPENCODE_CONFIG_DIR/skills` and the smoke test verifies those links resolve correctly. That core is packaged inside this template, so third-party users do not need your personal `~/.skills` tree just to bootstrap successfully.
 
@@ -99,6 +99,8 @@ Recommended flow for a new machine:
 3. Run the smoke test.
 4. Confirm the output says which requested packs are `fully vendored`.
 5. Restart OpenCode and begin from the installed workspace config.
+
+Note: step 1 is optional because the bootstrap auto-creates `.env` if it does not exist.
 
 Example:
 
