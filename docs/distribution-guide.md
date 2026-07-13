@@ -19,9 +19,7 @@ Use this repository as the public distribution source for the CPE workstation bo
 ```bash
 git clone https://github.com/JulioCesarMClash/setup-workstation-cpe.git
 cd setup-workstation-cpe
-cp .env.example .env
-./scripts/bootstrap.sh --pack sdd --pack git-release
-./scripts/smoke-test.sh
+./install.sh --preset basic
 ```
 
 ### Windows PowerShell
@@ -29,9 +27,7 @@ cp .env.example .env
 ```powershell
 git clone https://github.com/JulioCesarMClash/setup-workstation-cpe.git
 cd setup-workstation-cpe
-Copy-Item .env.example .env
-.\scripts\bootstrap.ps1 --pack sdd --pack git-release
-.\scripts\smoke-test.ps1
+.\install.ps1 --preset basic
 ```
 
 ## How to verify a release
@@ -40,6 +36,7 @@ Copy-Item .env.example .env
 2. Check `CHANGELOG.md`.
 3. Check `pack-manifest.json` for vendored pack truth.
 4. Run the smoke test and confirm vendored-pack reporting matches the manifest.
+5. Generate release checksums if you are preparing downloadable artifacts: `./scripts/release-checksums.sh`
 
 ## Branch model
 
