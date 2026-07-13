@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from typing import Iterable
 
 
@@ -153,6 +154,19 @@ def ensure_env_file(env_file: Path, source_env: Path) -> bool:
     env_file.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source_env, env_file)
     return True
+
+
+def ensure_replaceable_path(path: Path, force: bool) -> Path | None:
+    if not path.exists() and not path.is_symlink():
+        return None
+
+    if not force:
+        raise RuntimeError(f"Refusing to replace existing path without --force: {path}")
+
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    backup = path.parent / f"{path.name}.backup-{timestamp}"
+    shutil.move(str(path), str(backup))
+    return backup
 
 
 def detect_command_paths() -> dict[str, str | None]:
@@ -332,11 +346,19 @@ def resolve_skill_source(skill_name: str, source_roots: Iterable[Path]) -> Path 
     return None
 
 
-def install_skill_symlinks(target_dir: Path, skill_names: list[str], source_roots: list[Path]) -> dict[str, list[str]]:
+def install_skill_symlinks(
+    target_dir: Path,
+    skill_names: list[str],
+    source_roots: list[Path],
+    force: bool = False,
+) -> dict[str, list[str]]:
     target_dir.mkdir(parents=True, exist_ok=True)
     installed: list[str] = []
     missing: list[str] = []
     failed: list[str] = []
+    copied: list[str] = []
+    conflicts: list[str] = []
+    backups: list[str] = []
 
     for skill_name in skill_names:
         source = resolve_skill_source(skill_name, source_roots)
@@ -349,18 +371,35 @@ def install_skill_symlinks(target_dir: Path, skill_names: list[str], source_root
             if link_path.is_symlink() and link_path.resolve() == source.resolve():
                 installed.append(skill_name)
                 continue
-            if link_path.is_dir() and not link_path.is_symlink():
-                shutil.rmtree(link_path)
-            else:
-                link_path.unlink()
+            try:
+                backup = ensure_replaceable_path(link_path, force=force)
+                if backup:
+                    backups.append(str(backup))
+            except RuntimeError:
+                conflicts.append(skill_name)
+                continue
 
         try:
             os.symlink(source, link_path, target_is_directory=source.is_dir())
             installed.append(skill_name)
         except OSError:
-            failed.append(skill_name)
+            try:
+                if source.is_dir():
+                    shutil.copytree(source, link_path, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(source, link_path)
+                copied.append(skill_name)
+            except OSError:
+                failed.append(skill_name)
 
-    return {"installed": installed, "missing": missing, "failed": failed}
+    return {
+        "installed": installed,
+        "missing": missing,
+        "failed": failed,
+        "copied": copied,
+        "conflicts": conflicts,
+        "backups": backups,
+    }
 
 
 def resolve_skill_selection(optional_packs: list[str]) -> list[str]:
@@ -420,6 +459,23 @@ def build_skill_source_roots(
     return deduped
 
 
+def validate_required_tools(command_paths: dict[str, str | None], updates: dict[str, str]) -> list[str]:
+    required = ["opencode", "node", "npm", "git"]
+    missing = [name for name in required if not command_paths.get(name)]
+
+    model_values = [value for key, value in updates.items() if key.endswith("_MODEL") or key == "GENTLE_DEFAULT_MODEL"]
+    if any(value.startswith("ollama/") for value in model_values) and not command_paths.get("ollama"):
+        missing.append("ollama")
+
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for item in missing:
+        if item not in seen:
+            deduped.append(item)
+            seen.add(item)
+    return deduped
+
+
 def scaffold_obsidian_workspace(vault_path: Path) -> None:
     files = {
         "00-MOC/MOC-Master.md": "# MOC Master\n\n- [[00-MOC/MOC-Proyectos]]\n- [[50-Projects/_TEMPLATE/Index]]\n",
@@ -443,6 +499,12 @@ def print_skill_link_summary(result: dict[str, list[str]], optional_packs: list[
             print(f"- Optional packs fully vendored: {', '.join(vendored_requested)}")
     if result["installed"]:
         print(f"- Skill symlinks installed: {', '.join(result['installed'])}")
+    if result.get("copied"):
+        print(f"- Skill directories copied as fallback: {', '.join(result['copied'])}")
+    if result.get("backups"):
+        print(f"- Backups created: {', '.join(result['backups'])}")
+    if result.get("conflicts"):
+        print(f"- Skill conflicts requiring --force: {', '.join(result['conflicts'])}")
     if result["missing"]:
         print(f"- Skills missing from source roots: {', '.join(result['missing'])}")
     if result["failed"]:
@@ -682,6 +744,7 @@ def main() -> int:
     parser.add_argument("--pack", action="append", default=[], choices=sorted(OPTIONAL_SKILL_PACKS.keys()))
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--skip-installs", action="store_true")
+    parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
     env_file = Path(args.env_file)
@@ -748,7 +811,26 @@ def main() -> int:
     env_text = merge_env_text(source_env.read_text(encoding="utf-8"), updates)
     env_file.write_text(env_text, encoding="utf-8")
 
+    missing_required_tools = validate_required_tools(command_paths, updates)
+    if missing_required_tools:
+        print(f"Missing required tools for selected profile: {', '.join(missing_required_tools)}", file=sys.stderr)
+        return 1
+
     opencode_config_dir = Path(updates["OPENCODE_CONFIG_DIR"])
+    config_path = opencode_config_dir / "opencode.json"
+    if config_path.exists():
+        try:
+            current_text = config_path.read_text(encoding="utf-8")
+            candidate_text = (ROOT_DIR / "config" / "opencode.template.json").read_text(encoding="utf-8")
+            rendered_candidate = re.compile(r"\$\{([A-Z0-9_]+)\}").sub(lambda match: updates.get(match.group(1), ""), candidate_text)
+            candidate_json = json.dumps(json.loads(rendered_candidate), indent=2) + "\n"
+            if current_text != candidate_json:
+                backup = ensure_replaceable_path(config_path, force=args.force)
+                if backup:
+                    print(f"Backed up existing OpenCode config to: {backup}")
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
     render_template(ROOT_DIR / "config" / "opencode.template.json", opencode_config_dir / "opencode.json", updates)
     copy_tree_contents(ROOT_DIR / "prompts", opencode_config_dir / "prompts")
     copy_tree_contents(ROOT_DIR / "commands", opencode_config_dir / "commands")
@@ -758,7 +840,11 @@ def main() -> int:
         target_dir=opencode_config_dir / "skills",
         skill_names=selected_skills,
         source_roots=skill_source_roots,
+        force=args.force,
     )
+    if skill_link_result.get("conflicts"):
+        print("Refusing to replace existing skill directories without --force.", file=sys.stderr)
+        return 1
 
     if obsidian_vault_path:
         scaffold_obsidian_workspace(Path(obsidian_vault_path))
