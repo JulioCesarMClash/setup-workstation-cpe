@@ -18,6 +18,16 @@ This repository packages the reusable workstation architecture only. It does not
 .\scripts\smoke-test.ps1
 ```
 
+One-command local entrypoints:
+
+```bash
+./install.sh --preset basic
+```
+
+```powershell
+.\install.ps1 --preset basic
+```
+
 The bootstrap asks whether the user has OpenCode Go access. If not, it falls back to the available local models instead of forcing the exact models used on your machine.
 
 It also asks whether to install Claude Code as an optional secondary agent. OpenCode remains the main configured workspace runtime.
@@ -27,6 +37,8 @@ When supported on the host, the bootstrap can attempt to install missing tools s
 If Python is missing, the bootstrap wrappers try to install it first using the host package manager. If `.env` is missing, the bootstrap creates it automatically from `.env.example`.
 
 The bootstrap also installs a small default skill core as symlinks into `OPENCODE_CONFIG_DIR/skills` and the smoke test verifies those links resolve correctly. That core is packaged inside this template, so third-party users do not need your personal `~/.skills` tree just to bootstrap successfully.
+
+If existing OpenCode config or installed skill directories would be replaced, bootstrap now refuses unless you pass `--force`. When forced, it creates backups first.
 
 For fast installer iteration without touching your real profile:
 
@@ -46,6 +58,7 @@ Restart OpenCode after installation. OpenCode loads config at startup.
 - Release artifact source of truth: `pack-manifest.json`
 - Distribution guide: `docs/distribution-guide.md`
 - Guided installation: `docs/guided-installation.md`
+- Supported platforms: `docs/supported-platforms.md`
 - Workspace usage: `docs/workspace-usage.md`
 
 ## What This Installs
@@ -59,6 +72,7 @@ Restart OpenCode after installation. OpenCode loads config at startup.
 | `pack-manifest.json` | Machine-readable inventory of vendored core/packs |
 | `docs/architecture-map.md` | System map and diagrams |
 | `docs/replication-audit.md` | Portability and security audit |
+| `scripts/uninstall.py` | Safe uninstall / rollback entry point |
 
 ## Default Skill Core
 
@@ -81,6 +95,15 @@ Everything else should be treated as opt-in packs or environment-specific add-on
 | `frontend` | Frontend-specific testing and UI workflow skills |
 | `git-release` | PR, issue, branch, release, and worktree workflow skills |
 | `advanced-review` | Heavier review, audit, MCP, and skill-authoring helpers |
+
+## Presets
+
+| Preset | Packs |
+|---|---|
+| `basic` | `git-release` |
+| `data` | `data-etl`, `docs-jira` |
+| `frontend` | `frontend`, `git-release` |
+| `full` | all vendored packs |
 
 Example without personal skill directories:
 
@@ -112,6 +135,26 @@ Example:
 ```
 
 If you want a step-by-step walkthrough instead of the short path, start with `docs/guided-installation.md` and then `docs/workspace-usage.md`.
+
+## Rollback / Uninstall
+
+If you need to back out the installation:
+
+```bash
+./scripts/uninstall.sh
+```
+
+```powershell
+.\scripts\uninstall.ps1
+```
+
+If the bootstrap created `.env` automatically and you want it removed too:
+
+```bash
+./scripts/uninstall.sh --remove-env
+```
+
+The uninstall script uses the installer state file written into `OPENCODE_CONFIG_DIR` and restores backed-up config when available.
 
 ## Required Dependencies
 

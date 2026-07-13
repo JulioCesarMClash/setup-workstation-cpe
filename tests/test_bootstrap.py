@@ -222,3 +222,38 @@ def test_validate_required_tools_requires_ollama_for_ollama_profiles():
     )
 
     assert missing == ["ollama"]
+
+
+def test_resolve_selected_packs_merges_presets_and_explicit_packs():
+    packs = bootstrap.resolve_selected_packs(["basic", "frontend"], ["docs-jira"])
+
+    assert packs == ["git-release", "frontend", "docs-jira"]
+
+
+def test_write_bootstrap_report_creates_machine_readable_report(tmp_path):
+    report_path = bootstrap.write_bootstrap_report(
+        root_dir=tmp_path,
+        payload={"status": "success", "packs": ["sdd"]},
+    )
+
+    assert report_path.exists()
+    assert report_path.name == "latest-install.json"
+    assert "success" in report_path.read_text(encoding="utf-8")
+
+
+def test_build_uninstall_state_includes_installed_skill_results(tmp_path):
+    state = bootstrap.build_uninstall_state(
+        opencode_config_dir=tmp_path / ".config" / "opencode",
+        config_backup=tmp_path / "opencode.json.backup-1",
+        skill_link_result={
+            "installed": ["brainstorming"],
+            "copied": ["security-review"],
+            "missing": [],
+            "failed": [],
+            "conflicts": [],
+            "backups": [],
+        },
+    )
+
+    assert state["config_backup"].endswith("opencode.json.backup-1")
+    assert state["installed_skills"] == ["brainstorming", "security-review"]
