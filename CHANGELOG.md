@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.3
+
+- Added uninstall and rollback scripts based on installer state.
+- Added supported platform matrix and fresh-host smoke workflow scaffold.
+- Added pack presets and one-command installer entrypoints.
+- Added diagnostic install report and release checksum helper.
+- Improved bootstrap completion summary with explicit next steps and generated paths.
+
 ## v1.0.2
 
 - Added guided installation documentation for first-run setup.
