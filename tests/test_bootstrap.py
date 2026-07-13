@@ -166,3 +166,59 @@ def test_build_python_install_command_prefers_brew_on_darwin():
     )
 
     assert command == ["brew", "install", "python"]
+
+
+def test_ensure_replaceable_path_requires_force(tmp_path):
+    target = tmp_path / "opencode.json"
+    target.write_text("{}\n", encoding="utf-8")
+
+    try:
+        bootstrap.ensure_replaceable_path(target, force=False)
+    except RuntimeError as exc:
+        assert "--force" in str(exc)
+    else:
+        raise AssertionError("Expected RuntimeError when replacing without force")
+
+
+def test_ensure_replaceable_path_moves_existing_file_when_forced(tmp_path):
+    target = tmp_path / "opencode.json"
+    target.write_text("{}\n", encoding="utf-8")
+
+    backup = bootstrap.ensure_replaceable_path(target, force=True)
+
+    assert backup is not None
+    assert backup.exists()
+    assert not target.exists()
+
+
+def test_install_skill_symlinks_falls_back_to_copy_when_symlink_fails(tmp_path, monkeypatch):
+    source_root = tmp_path / "skills"
+    target_root = tmp_path / "installed"
+    (source_root / "brainstorming").mkdir(parents=True)
+    (source_root / "brainstorming" / "SKILL.md").write_text("# brainstorming\n", encoding="utf-8")
+
+    def fail_symlink(*args, **kwargs):
+        raise OSError("symlink not allowed")
+
+    monkeypatch.setattr(bootstrap.os, "symlink", fail_symlink)
+
+    result = bootstrap.install_skill_symlinks(
+        target_dir=target_root,
+        skill_names=["brainstorming"],
+        source_roots=[source_root],
+    )
+
+    installed_path = target_root / "brainstorming"
+    assert installed_path.exists()
+    assert not installed_path.is_symlink()
+    assert (installed_path / "SKILL.md").exists()
+    assert result["copied"] == ["brainstorming"]
+
+
+def test_validate_required_tools_requires_ollama_for_ollama_profiles():
+    missing = bootstrap.validate_required_tools(
+        command_paths={"opencode": "opencode", "node": "node", "npm": "npm", "git": "git", "ollama": None},
+        updates={"GENTLE_DEFAULT_MODEL": "ollama/gemma4:31b", "SDD_APPLY_MODEL": "ollama/qwen2.5-coder:14b"},
+    )
+
+    assert missing == ["ollama"]
