@@ -22,6 +22,8 @@ DEFAULT_SKILLS_DIR = Path.home() / ".skills"
 DEFAULT_TEMPLATE_SKILLS_DIR = ROOT_DIR / "default-skills"
 OPTIONAL_PACKS_DIR = ROOT_DIR / "optional-packs"
 PACK_MANIFEST_PATH = ROOT_DIR / "pack-manifest.json"
+BOOTSTRAP_STATE_DIR = ROOT_DIR / ".bootstrap-state"
+BOOTSTRAP_REPORT_PATH = BOOTSTRAP_STATE_DIR / "latest-install.json"
 DEFAULT_SYSTEM_SKILLS = [
     "brainstorming",
     "security-review",
@@ -91,6 +93,12 @@ OPTIONAL_SKILL_PACKS = {
         "skill-improver",
         "senior-skill-architect-master",
     ],
+}
+PACK_PRESETS = {
+    "basic": ["git-release"],
+    "data": ["data-etl", "docs-jira"],
+    "frontend": ["frontend", "git-release"],
+    "full": ["sdd", "git-release", "docs-jira", "advanced-review", "frontend", "data-etl"],
 }
 
 
@@ -420,6 +428,24 @@ def resolve_skill_selection(optional_packs: list[str]) -> list[str]:
     return selected
 
 
+def resolve_selected_packs(presets: list[str], explicit_packs: list[str]) -> list[str]:
+    selected: list[str] = []
+    seen: set[str] = set()
+
+    for preset in presets:
+        for pack_name in PACK_PRESETS.get(preset, []):
+            if pack_name not in seen:
+                selected.append(pack_name)
+                seen.add(pack_name)
+
+    for pack_name in explicit_packs:
+        if pack_name not in seen:
+            selected.append(pack_name)
+            seen.add(pack_name)
+
+    return selected
+
+
 def get_vendored_pack_names() -> list[str]:
     return sorted(
         pack_name
@@ -457,6 +483,39 @@ def build_skill_source_roots(
             deduped.append(root)
             seen.add(normalized)
     return deduped
+
+
+def write_bootstrap_report(root_dir: Path, payload: dict) -> Path:
+    report_dir = root_dir / ".bootstrap-state"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / "latest-install.json"
+    report_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return report_path
+
+
+def build_uninstall_state(
+    opencode_config_dir: Path,
+    config_backup: Path | None,
+    skill_link_result: dict[str, list[str]],
+    env_file: Path | None = None,
+    env_created: bool = False,
+) -> dict:
+    installed_skills = list(skill_link_result.get("installed", [])) + list(skill_link_result.get("copied", []))
+    return {
+        "opencode_config_dir": str(opencode_config_dir),
+        "config_path": str(opencode_config_dir / "opencode.json"),
+        "config_backup": str(config_backup) if config_backup else "",
+        "installed_skills": installed_skills,
+        "env_file": str(env_file) if env_file else "",
+        "env_created": env_created,
+    }
+
+
+def write_uninstall_state(opencode_config_dir: Path, state: dict) -> Path:
+    state_path = opencode_config_dir / ".setup-workstation-cpe-state.json"
+    opencode_config_dir.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    return state_path
 
 
 def validate_required_tools(command_paths: dict[str, str | None], updates: dict[str, str]) -> list[str]:
@@ -719,6 +778,8 @@ def print_summary(
     enable_claude_code: bool,
     skill_link_result: dict[str, list[str]],
     optional_packs: list[str],
+    report_path: Path | None,
+    uninstall_state_path: Path | None,
 ) -> None:
     print("\nBootstrap complete")
     print(f"- Env file: {env_file}")
@@ -726,9 +787,16 @@ def print_summary(
     print("- Primary agent runtime: OpenCode")
     print(f"- Optional Claude Code enabled for this setup: {enable_claude_code}")
     print_skill_link_summary(skill_link_result, optional_packs)
+    if report_path:
+        print(f"- Diagnostic report: {report_path}")
+    if uninstall_state_path:
+        print(f"- Uninstall state: {uninstall_state_path}")
     if obsidian_vault_path:
         print(f"- Obsidian vault scaffolded at: {obsidian_vault_path}")
-    print("- Restart OpenCode after installation.")
+    print("- Next steps:")
+    print("  1. Restart OpenCode after installation.")
+    print("  2. Run /connect inside OpenCode if provider access is not configured yet.")
+    print("  3. Ask one simple prompt to confirm the workstation is alive.")
 
 
 def main() -> int:
@@ -742,6 +810,7 @@ def main() -> int:
     parser.add_argument("--skills-dir", default="")
     parser.add_argument("--skill-source-dir", action="append", default=[])
     parser.add_argument("--pack", action="append", default=[], choices=sorted(OPTIONAL_SKILL_PACKS.keys()))
+    parser.add_argument("--preset", action="append", default=[], choices=sorted(PACK_PRESETS.keys()))
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--skip-installs", action="store_true")
     parser.add_argument("--force", action="store_true")
@@ -753,8 +822,11 @@ def main() -> int:
         print(f"Missing source env file: {source_env}", file=sys.stderr)
         return 1
 
-    if ensure_env_file(env_file, source_env):
+    env_created = ensure_env_file(env_file, source_env)
+    if env_created:
         print(f"Created env file from template: {env_file}")
+
+    selected_packs = resolve_selected_packs(args.preset, args.pack)
 
     platform_name = detect_platform_name()
     command_paths = detect_command_paths()
@@ -792,7 +864,7 @@ def main() -> int:
     opencode_config_dir = args.opencode_config_dir or base_env.get("OPENCODE_CONFIG_DIR") or str(DEFAULT_OPENCODE_CONFIG_DIR)
     gentle_skills_dir = args.skills_dir or base_env.get("GENTLE_SKILLS_DIR") or str(DEFAULT_SKILLS_DIR)
     explicit_skill_source_roots = [Path(path).expanduser() for path in args.skill_source_dir]
-    skill_source_roots = build_skill_source_roots(args.pack, explicit_skill_source_roots, gentle_skills_dir)
+    skill_source_roots = build_skill_source_roots(selected_packs, explicit_skill_source_roots, gentle_skills_dir)
     if not obsidian_vault_path and prompt_yes_no("Configure an Obsidian vault scaffold?", default=True, assume_yes=args.yes):
         default_vault = str(Path.home() / "Obsidian" / "Gentle-AI-Workspace")
         obsidian_vault_path = prompt_text("Obsidian vault path", default_vault, args.yes)
@@ -807,7 +879,7 @@ def main() -> int:
         opencode_config_dir=opencode_config_dir,
         gentle_skills_dir=gentle_skills_dir,
     )
-    updates["GENTLE_OPTIONAL_PACKS"] = ",".join(args.pack)
+    updates["GENTLE_OPTIONAL_PACKS"] = ",".join(selected_packs)
     env_text = merge_env_text(source_env.read_text(encoding="utf-8"), updates)
     env_file.write_text(env_text, encoding="utf-8")
 
@@ -817,6 +889,7 @@ def main() -> int:
         return 1
 
     opencode_config_dir = Path(updates["OPENCODE_CONFIG_DIR"])
+    config_backup: Path | None = None
     config_path = opencode_config_dir / "opencode.json"
     if config_path.exists():
         try:
@@ -825,9 +898,9 @@ def main() -> int:
             rendered_candidate = re.compile(r"\$\{([A-Z0-9_]+)\}").sub(lambda match: updates.get(match.group(1), ""), candidate_text)
             candidate_json = json.dumps(json.loads(rendered_candidate), indent=2) + "\n"
             if current_text != candidate_json:
-                backup = ensure_replaceable_path(config_path, force=args.force)
-                if backup:
-                    print(f"Backed up existing OpenCode config to: {backup}")
+                config_backup = ensure_replaceable_path(config_path, force=args.force)
+                if config_backup:
+                    print(f"Backed up existing OpenCode config to: {config_backup}")
         except RuntimeError as exc:
             print(str(exc), file=sys.stderr)
             return 1
@@ -835,7 +908,7 @@ def main() -> int:
     copy_tree_contents(ROOT_DIR / "prompts", opencode_config_dir / "prompts")
     copy_tree_contents(ROOT_DIR / "commands", opencode_config_dir / "commands")
     copy_tree_contents(ROOT_DIR / "skills", opencode_config_dir / "skills")
-    selected_skills = resolve_skill_selection(args.pack)
+    selected_skills = resolve_skill_selection(selected_packs)
     skill_link_result = install_skill_symlinks(
         target_dir=opencode_config_dir / "skills",
         skill_names=selected_skills,
@@ -849,13 +922,34 @@ def main() -> int:
     if obsidian_vault_path:
         scaffold_obsidian_workspace(Path(obsidian_vault_path))
 
+    uninstall_state = build_uninstall_state(
+        opencode_config_dir=opencode_config_dir,
+        config_backup=config_backup,
+        skill_link_result=skill_link_result,
+        env_file=env_file,
+        env_created=env_created,
+    )
+    uninstall_state_path = write_uninstall_state(opencode_config_dir, uninstall_state)
+    report_path = write_bootstrap_report(
+        ROOT_DIR,
+        {
+            "status": "success",
+            "packs": selected_packs,
+            "vendored_packs": [pack for pack in selected_packs if pack in get_vendored_pack_names()],
+            "env_file": str(env_file),
+            "env_created": env_created,
+            "opencode_config": str(opencode_config_dir / "opencode.json"),
+            "skill_result": skill_link_result,
+        },
+    )
+
     enable_graphify_hooks = (not args.skip_installs) and prompt_yes_no(
         "Install Graphify OpenCode hooks in this workspace?",
         default=True,
         assume_yes=args.yes,
     )
     maybe_run_post_install_hooks(command_paths, ROOT_DIR, enable_graphify_hooks)
-    print_summary(opencode_config_dir, env_file, obsidian_vault_path, enable_claude_code, skill_link_result, args.pack)
+    print_summary(opencode_config_dir, env_file, obsidian_vault_path, enable_claude_code, skill_link_result, selected_packs, report_path, uninstall_state_path)
     return 0
 
 
