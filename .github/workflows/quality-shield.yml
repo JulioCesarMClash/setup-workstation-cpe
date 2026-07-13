@@ -1,0 +1,204 @@
+name: Quality Shield
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - staging
+      - main
+  push:
+    branches:
+      - develop
+      - staging
+      - main
+
+concurrency:
+  group: quality-shield-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  promotion-source-guard:
+    name: Promotion source guard
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate promotion source branch
+        run: |
+          base="${GITHUB_BASE_REF}"
+          head="${GITHUB_HEAD_REF}"
+          if [[ "$base" == "staging" && "$head" != "develop" ]]; then
+            echo "❌ Promotion to staging must come from develop. Current head: $head"
+            exit 1
+          fi
+          if [[ "$base" == "main" && "$head" != "staging" ]]; then
+            echo "❌ Promotion to main must come from staging. Current head: $head"
+            exit 1
+          fi
+          echo "✅ Promotion source is valid for base=$base head=$head"
+
+  local-governance-guard:
+    name: Local-only files guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Fail if local-only governance files are tracked
+        run: |
+          tracked=$(git ls-files '.claude/*' 'tests/test_ai_governance_scaffold.py')
+          if [[ -n "$tracked" ]]; then
+            echo "❌ Local-only governance files are tracked:"
+            echo "$tracked"
+            exit 1
+          fi
+          echo "✅ No local-only governance files are tracked"
+
+  lint-collect:
+    name: Lint & collect
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5.3.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt ruff
+      - name: Ruff lint
+        run: ruff check .
+      - name: Validate test collection
+        run: python -m pytest tests/ --collect-only -q
+
+  unit:
+    name: Unit tests — required
+    runs-on: ubuntu-latest
+    needs: lint-collect
+    env:
+      APP_ENV: testing
+      API_KEY: ci-test-key-placeholder
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5.3.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt ruff
+      - name: Run full unit suite (no integration)
+        run: python -m pytest tests/ -m "not integration" --tb=short -q
+
+  integration-required:
+    name: Integration tests — required on staging/main
+    runs-on: ubuntu-latest
+    needs: lint-collect
+    env:
+      APP_ENV: staging
+      API_KEY: ${{ secrets.API_KEY || 'ci-test-key-placeholder' }}
+      POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+      POSTGRES_PORT: ${{ secrets.POSTGRES_PORT || '5432' }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_SSLMODE: ${{ secrets.POSTGRES_SSLMODE || 'prefer' }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5.3.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt ruff
+      - name: Run required integration policy
+        run: |
+          branch="${GITHUB_BASE_REF:-${GITHUB_REF_NAME}}"
+          if [[ "$branch" != "staging" && "$branch" != "main" ]]; then
+            echo "ℹ️ Blocking integration applies only to staging/main. Current branch: $branch"
+            exit 0
+          fi
+          if [[ "${{ vars.INTEGRATION_ENABLED }}" != "true" ]]; then
+            echo "❌ INTEGRATION_ENABLED must be true for $branch"
+            exit 1
+          fi
+          for name in POSTGRES_HOST POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "❌ Missing required secret: $name"
+              exit 1
+            fi
+          done
+          python -m pytest tests/ -m integration --tb=short -q
+
+  integration-advisory:
+    name: Integration tests — advisory on develop
+    if: ${{ (github.base_ref == 'develop' || github.ref_name == 'develop') && vars.INTEGRATION_ENABLED == 'true' }}
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    needs: lint-collect
+    env:
+      APP_ENV: testing
+      API_KEY: ${{ secrets.API_KEY || 'ci-test-key-placeholder' }}
+      POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
+      POSTGRES_PORT: ${{ secrets.POSTGRES_PORT || '5432' }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_SSLMODE: ${{ secrets.POSTGRES_SSLMODE || 'prefer' }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5.3.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt ruff
+      - name: Run advisory integration tests
+        run: python -m pytest tests/ -m integration --tb=short -q
+
+  develop-required:
+    name: Develop gate — required
+    if: ${{ always() && (github.base_ref == 'develop' || github.ref_name == 'develop') }}
+    runs-on: ubuntu-latest
+    needs: [promotion-source-guard, local-governance-guard, lint-collect, unit]
+    steps:
+      - name: Enforce develop required checks
+        run: |
+          for result in "${{ needs.promotion-source-guard.result }}" "${{ needs.local-governance-guard.result }}" "${{ needs.lint-collect.result }}" "${{ needs.unit.result }}"; do
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "❌ Develop gate blocked by result=$result"
+              exit 1
+            fi
+          done
+          echo "✅ Develop required gate green"
+
+  staging-required:
+    name: Staging gate — required
+    if: ${{ always() && (github.base_ref == 'staging' || github.ref_name == 'staging') }}
+    runs-on: ubuntu-latest
+    needs: [promotion-source-guard, local-governance-guard, lint-collect, unit, integration-required]
+    steps:
+      - name: Enforce staging required checks
+        run: |
+          for result in "${{ needs.promotion-source-guard.result }}" "${{ needs.local-governance-guard.result }}" "${{ needs.lint-collect.result }}" "${{ needs.unit.result }}" "${{ needs.integration-required.result }}"; do
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "❌ Staging gate blocked by result=$result"
+              exit 1
+            fi
+          done
+          echo "✅ Staging required gate green"
+
+  main-required:
+    name: Main gate — required
+    if: ${{ always() && (github.base_ref == 'main' || github.ref_name == 'main') }}
+    runs-on: ubuntu-latest
+    needs: [promotion-source-guard, local-governance-guard, lint-collect, unit, integration-required]
+    steps:
+      - name: Enforce main required checks
+        run: |
+          for result in "${{ needs.promotion-source-guard.result }}" "${{ needs.local-governance-guard.result }}" "${{ needs.lint-collect.result }}" "${{ needs.unit.result }}" "${{ needs.integration-required.result }}"; do
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "❌ Main gate blocked by result=$result"
+              exit 1
+            fi
+          done
+          echo "✅ Main required gate green"
