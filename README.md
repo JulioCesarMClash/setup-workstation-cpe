@@ -42,7 +42,7 @@ Restart OpenCode after installation. OpenCode loads config at startup.
 
 ## Release
 
-- Current version: `v1.0.0`
+- Current version: `v1.0.1`
 - Release artifact source of truth: `pack-manifest.json`
 - Distribution guide: `docs/distribution-guide.md`
 
